@@ -1,4 +1,5 @@
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 class EvenThread extends Thread {
@@ -71,6 +72,10 @@ class ShoeWarehouse {
         String shoeType = PRODUCT_TYPES.get(random.nextInt(PRODUCT_TYPES.size()));
         int quantity = random.nextInt(5) + 1;
         return new Order(orderCounter.getAndIncrement(), shoeType, quantity);
+    }
+    
+    public boolean hasOrders() {
+        return !orders.isEmpty();
     }
 }
 
@@ -163,9 +168,54 @@ public class Main {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        
+        System.out.println("\n=== Задание 3: ===");
+        ShoeWarehouse warehouse2 = new ShoeWarehouse();
+        int orderCount2 = 15;
+        
+        ExecutorService producerExecutor = Executors.newSingleThreadExecutor();
+        ExecutorService consumerExecutor = Executors.newFixedThreadPool(4);
+        
+        producerExecutor.submit(() -> {
+            for (int i = 0; i < orderCount2; i++) {
+                Order order = warehouse2.generateRandomOrder();
+                warehouse2.receiveOrder(order);
+                try {
+                    Thread.sleep(80);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
+        
+        for (int i = 0; i < 3; i++) {
+            consumerExecutor.submit(() -> {
+                for (int j = 0; j < 5; j++) {
+                    warehouse2.fulfillOrder();
+                    try {
+                        Thread.sleep(120);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            });
+        }
+        
+        producerExecutor.shutdown();
+        consumerExecutor.shutdown();
+        
+        try {
+            if (!producerExecutor.awaitTermination(1, TimeUnit.MINUTES)) {
+                producerExecutor.shutdownNow();
+            }
+            if (!consumerExecutor.awaitTermination(1, TimeUnit.MINUTES)) {
+                consumerExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            producerExecutor.shutdownNow();
+            consumerExecutor.shutdownNow();
+        }
     }
 }
-
-
-
-
